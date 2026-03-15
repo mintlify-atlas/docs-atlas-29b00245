@@ -1,0 +1,102 @@
+---
+title: "Configuration"
+description: "Configure EntityModelBinder options: default key column, key type, validation suppression, and MVC options"
+---
+
+EntityModelBinder is registered through `AddEntityModelBinder<TDbContext>` in your service configuration. An optional callback lets you tune its behavior globally.
+
+## Full registration example
+
+```csharp
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.DefaultPrimaryKeyColumnName = "Id";
+    options.DefaultPrimaryKeyType = EntityKeyType.Int;
+    options.SuppressModelStateInvalidFilter = true;
+    options.EnableSwaggerSchemaIds = true;
+    options.ControllerConfiguration = mvc =>
+    {
+        // Apply additional MVC options here
+    };
+});
+```
+
+## Options reference
+
+<ParamField path="options.DefaultPrimaryKeyColumnName" type="string" default="Id">
+  The property name used to look up entities when no `[EntityKey]` attribute is present on the action parameter. The value is matched case-insensitively against the entity's properties.
+
+  Use this when your entities use a consistent non-standard primary key name, such as `"ProductId"` or `"RecordKey"`.
+</ParamField>
+
+<ParamField path="options.DefaultPrimaryKeyType" type="EntityKeyType" default="EntityKeyType.Int">
+  The key type assumed when the binder cannot determine the type from the entity's property. Accepted values are `EntityKeyType.Int`, `EntityKeyType.Guid`, and `EntityKeyType.String`.
+
+  <Note>
+    This option is a fallback only. When the target property exists on the entity type, its CLR type is reflected and used directly — `DefaultPrimaryKeyType` is ignored. This option only takes effect when the property cannot be found, for example when the column name is wrong or the property is not publicly accessible.
+  </Note>
+</ParamField>
+
+<ParamField path="options.SuppressModelStateInvalidFilter" type="boolean" default="false">
+  When `true`, disables the built-in `ModelStateInvalidFilter` that automatically returns HTTP 400 for invalid model state.
+
+  Enable this when your entities are non-nullable reference types and you want to handle `null` entity parameters yourself in the controller rather than receiving an automatic 400 response from ASP.NET Core's filter.
+</ParamField>
+
+<ParamField path="options.EnableSwaggerSchemaIds" type="boolean" default="false">
+  When `true`, enables custom schema ID generation to prevent Swagger schema ID conflicts that can occur when entity types are used as model-bound parameters.
+
+  See [Swagger / OpenAPI support](/guides/swagger-support) for full setup instructions.
+</ParamField>
+
+<ParamField path="options.ControllerConfiguration" type="Action<MvcOptions>?">
+  An optional callback applied to the underlying `MvcOptions` during service registration. Use this to apply additional MVC configuration alongside the model binder, such as adding custom filters or output formatters.
+
+  ```csharp
+  options.ControllerConfiguration = mvc =>
+  {
+      mvc.Filters.Add<MyCustomFilter>();
+  };
+  ```
+</ParamField>
+
+## Real-world example: non-standard primary key column
+
+Suppose your database uses `ProductId` as the primary key column on every entity instead of `Id`. Set `DefaultPrimaryKeyColumnName` globally so you don't need `[EntityKey]` on every action:
+
+```csharp
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.DefaultPrimaryKeyColumnName = "ProductId";
+});
+```
+
+With this in place, all `IEntity` parameters are automatically looked up by `ProductId`:
+
+```csharp
+public class Product : IEntity
+{
+    public int ProductId { get; set; }  // matched by DefaultPrimaryKeyColumnName
+    public string Name { get; set; }
+    public decimal Price { get; set; }
+}
+
+// GET /products/7  →  WHERE ProductId = 7
+[HttpGet("products/{product}")]
+public IActionResult Get(Product product)
+{
+    if (product == null) return NotFound();
+    return Ok(product);
+}
+```
+
+You can still override per-action using `[EntityKey]` when a specific parameter needs a different lookup column.
+
+<CardGroup cols={2}>
+  <Card title="Custom entity key" icon="key" href="/guides/custom-entity-key">
+    Override the lookup column per action parameter with `[EntityKey]`.
+  </Card>
+  <Card title="Swagger / OpenAPI support" icon="book-open" href="/guides/swagger-support">
+    Resolve schema ID conflicts when using Swagger with entity-bound parameters.
+  </Card>
+</CardGroup>

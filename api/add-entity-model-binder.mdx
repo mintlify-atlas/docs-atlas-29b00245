@@ -1,0 +1,66 @@
+---
+title: "AddEntityModelBinder"
+description: "Extension method to register EntityModelBinder with your ASP.NET Core DI container"
+---
+
+`AddEntityModelBinder` is the primary entry point for integrating `EntityModelBinder` into an ASP.NET Core application. It is an extension method on `IServiceCollection` that registers the binder provider, scoped services, and controller configuration in a single call.
+
+## Method signature
+
+```csharp
+public static IServiceCollection AddEntityModelBinder<TDatabaseContext>(
+    this IServiceCollection services,
+    Action<EntityModelBinderOptions>? configure = null)
+    where TDatabaseContext : DbContext
+```
+
+## Type parameters
+
+<ResponseField name="TDatabaseContext" type="DbContext" required>
+  Must be a concrete class deriving from `DbContext`. This is the EF Core context used at request time to query entities. The context is registered as a scoped `DbContext` service.
+</ResponseField>
+
+## Parameters
+
+<ParamField path="services" type="IServiceCollection" required>
+  The DI service collection. In a minimal API setup this is accessed via `builder.Services`.
+</ParamField>
+
+<ParamField path="configure" type="Action<EntityModelBinderOptions>?">
+  An optional lambda to configure [`EntityModelBinderOptions`](/api/entity-model-binder-options). If not provided, all options use their default values.
+</ParamField>
+
+## Return value
+
+<ResponseField name="IServiceCollection" type="IServiceCollection">
+  Returns the same `services` instance to support method chaining.
+</ResponseField>
+
+## What the method registers
+
+Calling `AddEntityModelBinder` performs the following registrations:
+
+- **`DbContext`** — Registered as a scoped service mapped to `TDatabaseContext`.
+- **`EntityModelBinderOptions`** — Registered as a scoped service with the resolved configuration.
+- **`EntityModelBinderProvider<TDatabaseContext>`** — Inserted at position 0 of `ModelBinderProviders`, ensuring it takes priority over built-in providers.
+- **Optional:** When `SuppressModelStateInvalidFilter` is `true`, sets `SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true` on `MvcOptions`.
+- **Optional:** Applies any additional `MvcOptions` configuration provided via `ControllerConfiguration`.
+
+## Usage examples
+
+```csharp
+// Minimal registration
+builder.Services.AddEntityModelBinder<AppDbContext>();
+
+// With options
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.EnableSwaggerSchemaIds = true;
+    options.SuppressModelStateInvalidFilter = true;
+    options.DefaultPrimaryKeyColumnName = "Id";
+});
+```
+
+<Warning>
+  Call `AddEntityModelBinder` instead of calling `AddControllers` separately. The extension method calls `AddControllers` internally and inserts the model binder provider at the correct position. Calling `AddControllers` again later in your startup code may reset or duplicate the provider configuration.
+</Warning>

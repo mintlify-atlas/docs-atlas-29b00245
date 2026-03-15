@@ -1,0 +1,61 @@
+---
+title: "EntityModelBinderOptions"
+description: "Configuration options for EntityModelBinder registration"
+---
+
+`EntityModelBinderOptions` holds all configuration settings applied when registering `EntityModelBinder` via `AddEntityModelBinder`. Pass a configuration lambda to `AddEntityModelBinder` to set these values; otherwise all properties fall back to their defaults.
+
+## Class signature
+
+```csharp
+public class EntityModelBinderOptions
+{
+    public bool EnableSwaggerSchemaIds { get; set; } = false;
+    public bool SuppressModelStateInvalidFilter { get; set; } = false;
+    public string DefaultPrimaryKeyColumnName { get; set; } = "Id";
+    public EntityKeyType DefaultPrimaryKeyType { get; set; } = EntityKeyType.Int;
+    public Action<MvcOptions>? ControllerConfiguration { get; set; }
+}
+```
+
+## Properties
+
+<ParamField path="EnableSwaggerSchemaIds" type="bool" default="false">
+  Set to `true` to enable custom schema ID generation for Swagger/OpenAPI. This prevents schema name conflicts when multiple entities share the same short type name across different namespaces.
+</ParamField>
+
+<ParamField path="SuppressModelStateInvalidFilter" type="bool" default="false">
+  When `true`, suppresses automatic 400 responses for non-nullable reference type properties. Useful when you want to handle model validation manually in your controllers rather than relying on the built-in filter.
+</ParamField>
+
+<ParamField path="DefaultPrimaryKeyColumnName" type="string" default="Id">
+  The column name assumed when no `[EntityKey]` attribute is present on the parameter and no explicit key column has been configured. The match is case-insensitive.
+</ParamField>
+
+<ParamField path="DefaultPrimaryKeyType" type="EntityKeyType" default="EntityKeyType.Int">
+  The key type used as a final fallback when the type cannot be inferred from the entity's property. See [`EntityKeyType`](/api/entity-key-type) for the available values.
+</ParamField>
+
+<ParamField path="ControllerConfiguration" type="Action<MvcOptions>?">
+  An optional hook for applying additional MVC controller options during registration. This action is passed directly to `services.Configure<MvcOptions>()` before controllers are registered.
+</ParamField>
+
+## Usage example
+
+```csharp
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.EnableSwaggerSchemaIds = true;
+    options.SuppressModelStateInvalidFilter = true;
+    options.DefaultPrimaryKeyColumnName = "Id";
+    options.DefaultPrimaryKeyType = EntityKeyType.Guid;
+    options.ControllerConfiguration = mvc =>
+    {
+        mvc.Filters.Add<MyCustomFilter>();
+    };
+});
+```
+
+<Note>
+  `DefaultPrimaryKeyType` is only used as a final fallback. If the entity has a property matching `DefaultPrimaryKeyColumnName`, the key type is auto-detected from that property's CLR type — `DefaultPrimaryKeyType` is not consulted in that case.
+</Note>

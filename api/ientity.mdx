@@ -1,0 +1,40 @@
+---
+title: "IEntity"
+description: "Marker interface that enables route model binding for a class"
+---
+
+`IEntity` is the marker interface that signals to `EntityModelBinderProvider` that a class is eligible for automatic entity resolution from route values. Any class implementing `IEntity` will have its route parameter resolved by querying the configured EF Core `DbContext` using the specified key.
+
+## Interface definition
+
+```csharp
+public interface IEntity { }
+```
+
+The interface has no members. Its sole purpose is to serve as a marker so the binder provider can identify which parameter types to handle.
+
+## Implementing IEntity
+
+Implement `IEntity` on any model class you want to resolve from a route parameter:
+
+```csharp
+using EntityModelBinder;
+
+public class Product : IEntity
+{
+    public int Id { get; set; }
+    public string Slug { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+}
+```
+
+Once `Product` implements `IEntity`, any controller action parameter of type `Product` decorated with `[FromRoute]` will be automatically resolved from the database using the route value.
+
+<Note>
+  Any class implementing `IEntity` must also be registered in your `DbContext` as a `DbSet<T>` for EF Core to query it. If the type is not registered, the binder will not be able to find it and will return `null`.
+</Note>
+
+## Abstract classes
+
+Abstract classes that implement `IEntity` are skipped by `EntityModelBinderProvider`. The provider only activates for concrete, instantiable types. If you use an abstract base class that implements `IEntity`, the binder will not handle parameters of that abstract type — only parameters of concrete derived types.

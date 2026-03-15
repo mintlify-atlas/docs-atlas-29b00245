@@ -1,0 +1,57 @@
+---
+title: "EntityKeyType"
+description: "Enum that defines the supported primary key types for entity binding"
+---
+
+`EntityKeyType` specifies how a route value is parsed when resolving an entity's lookup key. It is used both as the `DefaultPrimaryKeyType` fallback in [`EntityModelBinderOptions`](/api/entity-model-binder-options) and as the resolved type when the binder auto-detects the key from an entity property.
+
+## Enum definition
+
+```csharp
+public enum EntityKeyType
+{
+    Int,
+    Guid,
+    String
+}
+```
+
+## Values
+
+<ResponseField name="Int" type="EntityKeyType">
+  Integer primary keys. The binder parses the route value using `int.TryParse`. If parsing fails, the binder returns the error: `"Id must be an integer."`
+</ResponseField>
+
+<ResponseField name="Guid" type="EntityKeyType">
+  GUID primary keys. The binder parses the route value using `Guid.TryParse`. If parsing fails, the binder returns the error: `"Id must be a valid GUID."`
+</ResponseField>
+
+<ResponseField name="String" type="EntityKeyType">
+  String primary keys or slugs. No conversion is applied — the raw route value is used directly as the lookup key.
+</ResponseField>
+
+## Auto-detection
+
+The binder automatically infers the correct `EntityKeyType` from the CLR type of the matching property on the entity. Manual configuration is only needed as a fallback when the property cannot be found.
+
+| Property CLR type | Resolved `EntityKeyType` |
+|-------------------|-------------------------|
+| `Guid` or `Guid?` | `EntityKeyType.Guid` |
+| `string` | `EntityKeyType.String` |
+| Any other type | `EntityKeyType.Int` |
+
+## DefaultPrimaryKeyType fallback
+
+`DefaultPrimaryKeyType` in `EntityModelBinderOptions` is only consulted when the binder cannot find a property on the entity that matches the key column name. In the common case where the entity has a property matching `DefaultPrimaryKeyColumnName`, auto-detection applies and `DefaultPrimaryKeyType` is not used.
+
+```csharp
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    // Only used when the key property cannot be found on the entity
+    options.DefaultPrimaryKeyType = EntityKeyType.Guid;
+});
+```
+
+<Note>
+  Use `EntityKeyType.String` when routing by a human-readable slug. Combine it with `[EntityKey("Slug")]` on the parameter and ensure the `Slug` property on your entity is of type `string`. The binder will pass the raw route segment directly to EF Core without any parsing.
+</Note>

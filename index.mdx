@@ -1,97 +1,72 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "EntityModelBinder"
+description: "A Laravel-inspired route model binder for ASP.NET Core. Automatically resolve EF Core entities from route parameters — no repetitive lookup code."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in under 5 minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="How It Works" icon="gears" href="/guides/how-it-works">
+    Understand the binding pipeline
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="API Reference" icon="code" href="/api/ientity">
+    Explore every public type and method
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Customize default key columns and types
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What is EntityModelBinder?
 
-Everything you need to create world-class documentation.
+EntityModelBinder brings **Laravel's route model binding** pattern to ASP.NET Core. Instead of manually fetching entities in every controller action, you declare the entity as a route parameter and it's resolved automatically from your Entity Framework Core database context.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+**Before** — repetitive boilerplate in every action:
 
-## Need inspiration?
+```csharp
+[HttpGet("{surveyId:int}")]
+public async Task<IActionResult> Show([FromRoute] int surveyId)
+{
+    var survey = await _dbContext.Survey.FindAsync(surveyId);
+    if (survey == null) return NotFound();
+    return Ok(survey);
+}
+```
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+**After** — clean, declarative controllers:
+
+```csharp
+[HttpGet("{survey}")]
+public IActionResult Show([FromRoute] Survey survey)
+    => survey == null ? NotFound() : Ok(survey);
+```
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Zero boilerplate" icon="wand-magic-sparkles">
+    Entities are fetched automatically from EF Core — no manual `FindAsync` calls
+  </Card>
+  <Card title="Custom key columns" icon="key">
+    Bind by any column (slug, GUID, string) using the `[EntityKey]` attribute
+  </Card>
+  <Card title="Flexible key types" icon="hashtag">
+    Supports `int`, `Guid`, and `string` primary key types out of the box
+  </Card>
+  <Card title="Swagger compatible" icon="book">
+    Optional schema ID fix for Swagger/OpenAPI integration
+  </Card>
+  <Card title="Multi-target" icon="layer-group">
+    Targets .NET 8, .NET 9, and .NET 10
+  </Card>
+  <Card title="MIT licensed" icon="scale-balanced">
+    Free to use in commercial and open-source projects
+  </Card>
+</CardGroup>
+
+## Requirements
+
+- .NET 8.0 or later (also supports .NET 9 and .NET 10)
+- ASP.NET Core
+- Entity Framework Core 8.0 or later

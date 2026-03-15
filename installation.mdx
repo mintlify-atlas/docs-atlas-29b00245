@@ -1,0 +1,115 @@
+---
+title: "Installation"
+description: "Install EntityModelBinder via NuGet into your ASP.NET Core project"
+---
+
+## Prerequisites
+
+<Note>
+  EntityModelBinder requires .NET 8+, ASP.NET Core 8+, and Entity Framework Core 8+. Make sure your project targets `net8.0` or later before proceeding.
+</Note>
+
+## Setup
+
+<Steps>
+  <Step title="Install the NuGet package">
+    Add EntityModelBinder to your project using your preferred package manager.
+
+    <CodeGroup>
+
+    ```bash dotnet CLI
+    dotnet add package EntityModelBinder
+    ```
+
+    ```bash Package Manager Console
+    Install-Package EntityModelBinder
+    ```
+
+    ```xml .csproj
+    <PackageReference Include="EntityModelBinder" Version="*" />
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Implement IEntity on your model">
+    Mark any entity class you want to bind from routes by implementing the `IEntity` interface.
+
+    ```csharp Product.cs
+    using EntityModelBinder;
+
+    public class Product : IEntity
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+    ```
+
+    `IEntity` is a marker interface with no required members. It tells EntityModelBinder which types are eligible for automatic resolution.
+  </Step>
+
+  <Step title="Register AddEntityModelBinder in Program.cs">
+    Call `AddEntityModelBinder<TDatabaseContext>()` on your service collection, passing your EF Core `DbContext` as the type argument.
+
+    ```csharp Program.cs
+    using EntityModelBinder;
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+    builder.Services.AddEntityModelBinder<AppDbContext>();
+
+    var app = builder.Build();
+
+    app.MapControllers();
+    app.Run();
+    ```
+
+    <Tip>
+      `AddEntityModelBinder` calls `AddControllers` internally with the model binder provider registered. You do not need a separate `services.AddControllers()` call.
+    </Tip>
+  </Step>
+
+  <Step title="Use [FromRoute] in your controllers">
+    Declare route-bound entities as parameters with `[FromRoute]`. The binder resolves them automatically.
+
+    ```csharp ProductsController.cs
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProductsController : ControllerBase
+    {
+        [HttpGet("{id}")]
+        public IActionResult Get([FromRoute] Product product)
+        {
+            return Ok(product);
+        }
+    }
+    ```
+
+    When a request arrives at `GET /api/products/42`, EntityModelBinder reads `id` from the route, queries EF Core for a `Product` with that primary key, and injects it into your action. If no record is found, a `404 Not Found` response is returned before your action runs.
+  </Step>
+</Steps>
+
+## Configuration options
+
+You can pass an optional configuration delegate to `AddEntityModelBinder` to customize its behavior.
+
+```csharp Program.cs
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.DefaultPrimaryKeyColumnName = "Id";      // default: "Id"
+    options.DefaultPrimaryKeyType = EntityKeyType.Int; // default: Int
+    options.EnableSwaggerSchemaIds = false;            // default: false
+    options.SuppressModelStateInvalidFilter = false;   // default: false
+});
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `DefaultPrimaryKeyColumnName` | `string` | `"Id"` | Column name used when no `[EntityKey]` attribute is present. |
+| `DefaultPrimaryKeyType` | `EntityKeyType` | `Int` | Key type used for the default lookup (`Int`, `Guid`, or `String`). |
+| `EnableSwaggerSchemaIds` | `bool` | `false` | Configures Swagger schema IDs for bound entity types. |
+| `SuppressModelStateInvalidFilter` | `bool` | `false` | Suppresses the implicit required attribute for non-nullable reference types. |

@@ -1,0 +1,136 @@
+---
+title: "How it works"
+description: "Understand the EntityModelBinder request pipeline and entity resolution process"
+---
+
+EntityModelBinder intercepts route parameters and automatically resolves them to database entities before your controller action runs. This page walks through the full request lifecycle.
+
+## Request lifecycle
+
+<Steps>
+  <Step title="Request arrives at a route">
+    A request comes in matching a route pattern like `/products/42` or `/products/my-slug`. The route value (`42` or `my-slug`) is extracted by ASP.NET Core's routing middleware and placed into the value provider.
+  </Step>
+
+  <Step title="EntityModelBinderProvider checks the parameter type">
+    `EntityModelBinderProvider` is invoked for each parameter in the action. It inspects the parameter's model type and checks whether it implements `IEntity` and is not abstract:
+
+    ```csharp
+    if (typeof(IEntity).IsAssignableFrom(modelType) && !modelType.IsAbstract)
+    {
+        var binderType = typeof(EntityModelBinder<>).MakeGenericType(modelType);
+        return new BinderTypeModelBinder(binderType);
+    }
+    ```
+
+    If the check passes, the provider returns an `EntityModelBinder<T>` for that parameter. Otherwise it returns `null` and ASP.NET Core falls back to its default binders.
+  </Step>
+
+  <Step title="EntityModelBinder reads the route value">
+    `EntityModelBinder<T>` calls `bindingContext.ValueProvider.GetValue(modelName)` using the parameter name as the key. For example, if your action parameter is named `product`, the binder looks for a route value named `product`.
+
+    <Tip>
+      If no value is found under the parameter's name, the binder automatically falls back to looking for a route value named `id`. This means routes like `/products/{id}` work without any extra configuration, even when the parameter is named something other than `id`.
+    </Tip>
+  </Step>
+
+  <Step title="Checks for an [EntityKey] attribute">
+    The binder inspects the action parameter's `ParameterInfo` for an `[EntityKey]` attribute. If one is present, its `ColumnName` value is used as the lookup column instead of the default.
+
+    ```csharp
+    var entityKeyAttr = parameterInfo.GetCustomAttribute<EntityKeyAttribute>(inherit: false);
+    if (entityKeyAttr != null)
+    {
+        // Use entityKeyAttr.ColumnName for the lookup
+    }
+    ```
+
+    If no attribute is present, the binder uses the configured `DefaultPrimaryKeyColumnName` (default: `"Id"`).
+  </Step>
+
+  <Step title="Determines the key type from the property type">
+    The binder reflects on the entity type to find the target property and infers the key type from it:
+
+    | Property type       | Resolved `EntityKeyType` |
+    | ------------------- | ------------------------ |
+    | `int`, `long`, etc. | `EntityKeyType.Int`      |
+    | `Guid`, `Guid?`     | `EntityKeyType.Guid`     |
+    | `string`            | `EntityKeyType.String`   |
+
+    The configured `DefaultPrimaryKeyType` is only used as a fallback when the property cannot be found on the entity type.
+  </Step>
+
+  <Step title="Converts and validates the raw string value">
+    The route value is always a raw string. The binder converts it to the correct CLR type:
+
+    - **Int**: parsed with `int.TryParse` — adds a model error if invalid
+    - **Guid**: parsed with `Guid.TryParse` — adds a model error if invalid
+    - **String**: used as-is, no conversion needed
+
+    If conversion fails, the binder adds a model error and returns without setting a result.
+  </Step>
+
+  <Step title="Queries the database with a LINQ expression">
+    The binder constructs an expression tree equivalent to `e => e.ColumnName == keyValue` and executes it against the `DbSet<T>`:
+
+    ```csharp
+    var parameter = Expression.Parameter(typeof(T), "e");
+    var property = Expression.Property(parameter, columnName);
+    var constant = Expression.Constant(keyValue, keyValue.GetType());
+    var equality = Expression.Equal(property, constant);
+    var lambda = Expression.Lambda<Func<T, bool>>(equality, parameter);
+    return await dbSet.FirstOrDefaultAsync(lambda);
+    ```
+
+    This translates to a `WHERE` clause in the generated SQL, so only one entity is fetched from the database.
+  </Step>
+
+  <Step title="Returns the entity (or null) to the controller">
+    If the entity is found, the binder sets `ModelBindingResult.Success(entity)` and clears the validation state for the parameter to prevent false validation failures.
+
+    <Info>
+      Validation state is cleared after a successful entity lookup. Without this, ASP.NET Core's model validation could incorrectly report the complex entity object as invalid because it wasn't submitted as a form value.
+    </Info>
+
+    If no entity matches the key, the binder sets `ModelBindingResult.Success(null)`. The controller is responsible for handling the `null` case — the binder does **not** automatically return a 404 response.
+
+    ```csharp
+    [HttpGet("products/{product}")]
+    public IActionResult Get(Product product)
+    {
+        if (product == null) return NotFound();
+        return Ok(product);
+    }
+    ```
+  </Step>
+</Steps>
+
+## Key type resolution summary
+
+The binder determines the key type by inspecting the entity's property at the resolved column name. Auto-detection always takes priority over the configured default:
+
+```csharp
+private static EntityKeyType DetermineKeyType(Type propertyType)
+{
+    if (propertyType == typeof(Guid) || propertyType == typeof(Guid?))
+        return EntityKeyType.Guid;
+    if (propertyType == typeof(string))
+        return EntityKeyType.String;
+    return EntityKeyType.Int; // default for int, long, short, etc.
+}
+```
+
+## What happens when the entity is not found
+
+When `FirstOrDefaultAsync` returns `null`, the binder does not throw an exception or produce a 404. It binds `null` to the parameter and leaves model state valid. Your controller action receives a `null` argument and must decide how to respond.
+
+This design keeps the binder unopinionated about HTTP semantics — some controllers may want to return 404, others may want to return 200 with an empty response.
+
+<CardGroup cols={2}>
+  <Card title="Custom entity key" icon="key" href="/guides/custom-entity-key">
+    Use `[EntityKey]` to bind by slug, GUID, or any other column.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Set default key column, key type, and other global options.
+  </Card>
+</CardGroup>

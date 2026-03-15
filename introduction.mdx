@@ -1,0 +1,65 @@
+---
+title: "Introduction"
+description: "EntityModelBinder: Laravel-style route model binding for ASP.NET Core"
+---
+
+## What is EntityModelBinder?
+
+EntityModelBinder is a NuGet library that brings Laravel-style route model binding to ASP.NET Core. Instead of manually fetching entities from your database inside every controller action, you declare the entity as a parameter and the binder resolves it automatically from the route — including 404 handling when the record does not exist.
+
+It integrates directly with Entity Framework Core and requires minimal configuration.
+
+## The problem it solves
+
+Without EntityModelBinder, a typical controller action looks like this:
+
+```csharp Before: manual lookup
+[HttpGet("{id}")]
+public async Task<IActionResult> GetProduct(int id)
+{
+    var product = await _context.Products.FindAsync(id);
+    if (product == null)
+        return NotFound();
+
+    return Ok(product);
+}
+```
+
+This pattern is repeated across every action that needs a database entity: fetch by key, null-check, return 404, then proceed. In a typical CRUD API this means dozens of nearly identical lookups scattered throughout your controllers.
+
+With EntityModelBinder, the same action becomes:
+
+```csharp After: automatic binding
+[HttpGet("{id}")]
+public IActionResult GetProduct([FromRoute] Product product)
+{
+    return Ok(product);
+}
+```
+
+The framework resolves the `Product` from the route value `{id}`, queries EF Core, and returns a `404 Not Found` automatically if no record is found. Your action only runs when the entity exists.
+
+<Tip>
+  This pattern is identical to how Laravel's route model binding works. If you have used Laravel, EntityModelBinder will feel immediately familiar.
+</Tip>
+
+## Requirements
+
+- .NET 8 or later
+- ASP.NET Core 8 or later
+- Entity Framework Core 8 or later
+
+<Note>
+  EntityModelBinder works with any EF Core-supported database provider, including SQL Server, PostgreSQL, SQLite, and MySQL.
+</Note>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Installation" icon="package" href="/installation">
+    Install the NuGet package and wire up EntityModelBinder in your ASP.NET Core project.
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Follow a complete end-to-end example and have route model binding working in minutes.
+  </Card>
+</Columns>

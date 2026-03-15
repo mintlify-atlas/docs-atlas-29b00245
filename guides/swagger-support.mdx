@@ -1,0 +1,101 @@
+---
+title: "Swagger / OpenAPI support"
+description: "Resolve schema ID conflicts when using EntityModelBinder with Swagger"
+---
+
+When EntityModelBinder is used alongside Swashbuckle (Swagger), you may encounter schema ID conflicts that prevent Swagger from generating a valid OpenAPI document. This page explains why the conflict occurs and how to resolve it.
+
+## The problem
+
+<Warning>
+  Swagger generates a schema ID for each type it encounters. When the same entity type appears both as a route-bound parameter (via EntityModelBinder) and as a response type, Swashbuckle can register two schemas with the same short class name, producing an error like:
+
+  ```
+  Conflicting schemaIds: Identical schemaIds detected for types A and B.
+  ```
+
+  This happens because Swashbuckle's default schema ID strategy uses only the short class name (e.g., `Product`), which collides when the same type is referenced in multiple contexts.
+</Warning>
+
+## Solution
+
+EntityModelBinder provides a built-in fix via the `EnableSwaggerSchemaIds` option, which works together with a custom schema ID function in Swashbuckle.
+
+<Steps>
+  <Step title="Enable EnableSwaggerSchemaIds in EntityModelBinder">
+    Set `EnableSwaggerSchemaIds = true` when registering EntityModelBinder:
+
+    ```csharp
+    builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+    {
+        options.EnableSwaggerSchemaIds = true;
+    });
+    ```
+
+    <Note>
+      `EnableSwaggerSchemaIds` only affects schema ID generation for the OpenAPI document — it has no effect on how entities are resolved from the database at runtime.
+    </Note>
+  </Step>
+
+  <Step title="Configure Swashbuckle to use custom schema IDs">
+    Update your `AddSwaggerGen` call to use `type.ToString()` as the schema ID function. This produces fully qualified type names (e.g., `MyApp.Models.Product`) instead of short names, eliminating the collision:
+
+    ```csharp
+    builder.Services.AddSwaggerGen(c =>
+    {
+        c.CustomSchemaIds(type => type.ToString());
+    });
+    ```
+  </Step>
+
+  <Step title="Verify Swagger generates without errors">
+    Start your application and navigate to `/swagger`. The Swagger UI should load without schema conflict errors, and all entity types should appear with their fully qualified names in the schema definitions.
+  </Step>
+</Steps>
+
+## Full Program.cs example
+
+Here is a complete minimal `Program.cs` with both options configured together:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Register your DbContext
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+// Register EntityModelBinder with Swagger schema ID support
+builder.Services.AddEntityModelBinder<AppDbContext>(options =>
+{
+    options.EnableSwaggerSchemaIds = true;
+});
+
+// Register Swagger with custom schema ID strategy
+builder.Services.AddSwaggerGen(c =>
+{
+    c.CustomSchemaIds(type => type.ToString());
+});
+
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseRouting();
+app.MapControllers();
+app.Run();
+```
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    See all available EntityModelBinder options.
+  </Card>
+  <Card title="How it works" icon="gear" href="/guides/how-it-works">
+    Understand the full request pipeline and entity resolution process.
+  </Card>
+</CardGroup>

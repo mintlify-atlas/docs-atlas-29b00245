@@ -1,0 +1,163 @@
+---
+title: "Custom entity key"
+description: "Use the [EntityKey] attribute to bind entities by any column — slug, GUID, or string"
+---
+
+By default, EntityModelBinder resolves entities using the `Id` column. The `[EntityKey]` attribute lets you override this on a per-parameter basis, binding by any property on the entity — a slug, a GUID identifier, or any other unique column.
+
+## Default behavior
+
+Without any attribute, the binder uses the column name configured in `DefaultPrimaryKeyColumnName` (default: `"Id"`):
+
+```csharp
+[HttpGet("products/{product}")]
+public IActionResult Get(Product product)
+{
+    if (product == null) return NotFound();
+    return Ok(product);
+}
+```
+
+For a `GET /products/42` request, the binder runs `WHERE Id = 42`.
+
+## Using [EntityKey] to bind by a different column
+
+Apply `[EntityKey("ColumnName")]` to the action parameter to tell the binder which property to look up:
+
+```csharp
+[HttpGet("products/{product}")]
+public IActionResult Get([FromRoute, EntityKey("Slug")] Product product)
+{
+    if (product == null) return NotFound();
+    return Ok(product);
+}
+```
+
+For a `GET /products/my-awesome-product` request, this runs `WHERE Slug = 'my-awesome-product'`.
+
+The entity model enabling this:
+
+```csharp
+public class Product : IEntity
+{
+    public int Id { get; set; }
+    public string Slug { get; set; }
+    public string Name { get; set; }
+}
+```
+
+## Supported key types
+
+The binder auto-detects the key type by reflecting on the property type declared on the entity. You do not need to specify the type — it is inferred automatically.
+
+| Property type   | Resolved key type        | Conversion              |
+| --------------- | ------------------------ | ----------------------- |
+| `int`           | `EntityKeyType.Int`      | `int.TryParse`          |
+| `Guid`, `Guid?` | `EntityKeyType.Guid`     | `Guid.TryParse`         |
+| `string`        | `EntityKeyType.String`   | None (used as-is)       |
+
+## Examples by key type
+
+<Tabs>
+  <Tab title="int">
+    Use when your lookup column is an integer primary key or foreign key.
+
+    ```csharp
+    public class Order : IEntity
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+    }
+    ```
+
+    ```csharp
+    // GET /orders/99  →  WHERE Id = 99
+    [HttpGet("orders/{order}")]
+    public IActionResult Get(Order order)
+    {
+        if (order == null) return NotFound();
+        return Ok(order);
+    }
+
+    // GET /orders/by-product/5  →  WHERE ProductId = 5
+    [HttpGet("orders/by-product/{order}")]
+    public IActionResult GetByProduct([FromRoute, EntityKey("ProductId")] Order order)
+    {
+        if (order == null) return NotFound();
+        return Ok(order);
+    }
+    ```
+  </Tab>
+
+  <Tab title="Guid">
+    Use when your entity uses a GUID as its identifier. The binder validates that the route value is a valid GUID before querying the database.
+
+    ```csharp
+    public class Document : IEntity
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; }
+        public string Content { get; set; }
+    }
+    ```
+
+    ```csharp
+    // GET /documents/3fa85f64-5717-4562-b3fc-2c963f66afa6  →  WHERE Id = '3fa85f64-...'
+    [HttpGet("documents/{document}")]
+    public IActionResult Get(Document document)
+    {
+        if (document == null) return NotFound();
+        return Ok(document);
+    }
+    ```
+
+    If the route value is not a valid GUID, the binder adds a model error (`"Id must be a valid GUID."`) and the action is not invoked.
+  </Tab>
+
+  <Tab title="string">
+    Use when your lookup column is a string — a slug, a username, a SKU, or any other string identifier.
+
+    ```csharp
+    public class Category : IEntity
+    {
+        public int Id { get; set; }
+        public string Slug { get; set; }
+        public string DisplayName { get; set; }
+    }
+    ```
+
+    ```csharp
+    // GET /categories/electronics  →  WHERE Slug = 'electronics'
+    [HttpGet("categories/{category}")]
+    public IActionResult Get([FromRoute, EntityKey("Slug")] Category category)
+    {
+        if (category == null) return NotFound();
+        return Ok(category);
+    }
+    ```
+
+    String values are used as-is without any conversion or validation beyond a null/empty check.
+  </Tab>
+</Tabs>
+
+## Attribute target
+
+<Note>
+  `[EntityKey]` is only valid on action **parameters** (`AttributeTargets.Parameter`). It cannot be placed on the entity class itself or on a property. Each action parameter can have at most one `[EntityKey]` attribute.
+</Note>
+
+## Column name matching
+
+<Warning>
+  The column name passed to `[EntityKey]` must exactly match a property name on the entity type. Matching is case-insensitive, but if no property with that name is found, the binder silently falls back to the default key column configured in `DefaultPrimaryKeyColumnName`. Double-check your spelling if lookups are not using the expected column.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="How it works" icon="gear" href="/guides/how-it-works">
+    Understand the full request pipeline and entity resolution steps.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Set the global default key column and key type.
+  </Card>
+</CardGroup>

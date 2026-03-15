@@ -1,0 +1,56 @@
+---
+title: "EntityKeyAttribute"
+description: "Specify a custom column to bind an entity by, instead of the default Id"
+---
+
+`EntityKeyAttribute` overrides the default primary key lookup for a specific action parameter. By default, `EntityModelBinder` resolves entities using the column defined in `DefaultPrimaryKeyColumnName` (typically `"Id"`). Apply `[EntityKey]` to a parameter when you want to look up an entity by a different property, such as a slug or external identifier.
+
+## Declaration
+
+```csharp
+[AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
+public class EntityKeyAttribute : Attribute
+{
+    public string ColumnName { get; }
+
+    public EntityKeyAttribute(string columnName)
+    {
+        ColumnName = columnName ?? throw new ArgumentNullException(nameof(columnName));
+    }
+}
+```
+
+## Constructor parameters
+
+<ParamField path="columnName" type="string" required>
+  The name of the property or column on the entity to use as the lookup key. The match is case-insensitive. For example, passing `"Slug"` will match a property named `Slug`, `slug`, or `SLUG` on the entity type.
+</ParamField>
+
+## Properties
+
+<ResponseField name="ColumnName" type="string" required>
+  The resolved column name provided to the constructor. This value is read by the binder at request time to determine which property to query against.
+</ResponseField>
+
+## Usage example
+
+Apply `[EntityKey]` alongside `[FromRoute]` on a controller action parameter:
+
+```csharp
+[HttpGet("products/{product}")]
+public IActionResult Get([FromRoute, EntityKey("Slug")] Product product)
+{
+    if (product == null) return NotFound();
+    return Ok(product);
+}
+```
+
+In this example, the binder will look up the `Product` entity by matching the route value for `product` against the `Slug` property, rather than the default `Id` column.
+
+<Warning>
+  `[EntityKey]` can only be applied to method parameters (`AttributeTargets.Parameter`). It will not work on class properties or method return types. Applying it elsewhere will result in a compile-time error.
+</Warning>
+
+<Note>
+  The key type (`int`, `Guid`, or `string`) is auto-detected from the property type on the entity. You do not need to specify it manually — if your `Slug` property is a `string`, the binder will treat the route value as a string automatically.
+</Note>
