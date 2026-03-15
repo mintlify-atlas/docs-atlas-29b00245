@@ -1,0 +1,67 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "EntityModelBinder",
+  "projectDescription": "A Laravel-inspired route model binder for ASP.NET Core that automatically resolves EF Core database entities from route parameters.",
+  "theme": "palm",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "installation", "quickstart"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/how-it-works",
+              "guides/custom-entity-key",
+              "guides/configuration",
+              "guides/swagger-support"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core",
+            "pages": [
+              "api/ientity",
+              "api/entity-key-attribute",
+              "api/entity-model-binder-options",
+              "api/add-entity-model-binder",
+              "api/entity-key-type"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automatically resolves EF Core entities from route parameters without manual lookup code",
+    "Laravel-inspired route model binding pattern for ASP.NET Core",
+    "Custom column binding via [EntityKey] attribute",
+    "Supports int, Guid, and string primary key types",
+    "Configurable default primary key column name and type",
+    "Swagger/OpenAPI schema ID conflict resolution support",
+    "Suppresses implicit required validation for bound entities",
+    "Compatible with .NET 8, 9, and 10"
+  ],
+  "publicApiSurface": [
+    "IEntity (marker interface for bindable models)",
+    "EntityKeyAttribute(string columnName) (parameter attribute for custom column binding)",
+    "EntityModelBinderExtensions.AddEntityModelBinder<TDatabaseContext>(IServiceCollection, Action<EntityModelBinderOptions>?) (DI registration extension)",
+    "EntityModelBinderOptions.EnableSwaggerSchemaIds (bool)",
+    "EntityModelBinderOptions.SuppressModelStateInvalidFilter (bool)",
+    "EntityModelBinderOptions.DefaultPrimaryKeyColumnName (string)",
+    "EntityModelBinderOptions.DefaultPrimaryKeyType (EntityKeyType)",
+    "EntityModelBinderOptions.ControllerConfiguration (Action<MvcOptions>?)",
+    "EntityKeyType enum (Int, Guid, String)"
+  ]
+}
